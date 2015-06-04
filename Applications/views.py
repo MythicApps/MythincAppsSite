@@ -12,7 +12,8 @@ from rest_framework.decorators import api_view
 
 # Create your views here.
 
-@api_view(["post"])
+@csrf_exempt
+@api_view(["POST"])
 def create(request):
     from django.contrib.auth.models import User
     if request.method == "POST":
@@ -79,39 +80,58 @@ def sponsorCreate(request):
 #Gender Identity !*
 #Where are you traveling from? *
 
+
+def getSchool(schoolName):
+    try:
+        skool = School.objects.get(name = schoolName)
+    except:
+        try:
+            skool = SchoolAbbreviations.objects.get(abbr = schoolName)
+        except:
+            skool = School(name = schoolName, type = "college", city = "east lansing", state = "Mi", country = "USA")
+    skool.save()
+    return skool
+
+#always add the api_view decorator the functions.
+
+@api_view(["POST"])
 @login_required
 def createApplicant(request):
     from django.contrib.auth.models import User
     if request.method == "POST":
-        username = request.POST.get("userName")
-        pw = request.POST.get("password")
-        if username.is_valid() and pw.is_valid():
-            AppForm = ApplicantForm(request.POST)
-            if AppForm.is_valid():
-                newApp = ApplicantForm(user = Applicant.user(request.POST.get),
-                                       DoB = Applicant.DoB(request.POST.get),
-                                       email = UserCreationForm.email(request.POST.get),
-                                       genderIdentity = UserTypeForm.Meta.model.genderIdentity(request.POST.get),
-                                       schoolName = Applicant.school(request.POST.get),
-                                       year = Applicant.year_choices(request.POST.get),
-                                       major = Applicant.major(request.POST.get),
-                                       github = Applicant.github(request.POST.get),
-                                       website = Applicant.website(request.POST.get),
-                                       linkedIn = Applicant.linkedIn(request.POST.get),
-                                       resume = Applicant.resume(request.POST.get),
-                                       otherHackathons = Applicant.otherHackathons(request.POST.get),
-                                       freeResponse = ApplicantForm.freeResponse(request.POST.get),
-                                       dietaryChoices = Applicant.dietary_choices(request.POST.get),
-                                       dietaryRestrictions = Applicant.dietaryRestrictions(request.POST.get),
-                                       otherDietaryRestrictions = Applicant.otherDietaryRestrictions(request.POST.get),
-                                       specialAccomodations = Applicant.specialAccommodations(request.POST.get),
-                                       travelChoices = Applicant.travel_choices(request.POST.get),
-                                       travelMethod = Applicant.travelMethod(request.POST.get),
-                                       travelingFrom = Applicant.travelingFrom(request.POST.get),
-                                       needReimbursement = Applicant.needReimbursement(request.POST.get))
-                newApp.save()
+        appForm = ApplicantForm(request.POST)
+        if appForm.is_valid():
+            #To get the parameter, You need to specify it as an argument to request.POST.get
+            # Eg, request.POST.get('user') vs request.POST.get
+            # Also this may need to be the model. IDK. I'm not supper familliar with modelForm.
+            user = UserType.objects.get(user = request.user)
+            newApplication = Applicant(user = user)
+            school = getSchool(request.POST.get("schoolName"))
+            if(not request.POST.get("notFromSchool")):
+                newApplication.travelingFrom = request.POST.get("travelInfo")
             else:
-                return JsonResponse({"Error":"Resource not available"},status=501)
+                newApplication.travelingFrom = "{0}, {1} {2}".format(school.city, school.state, school.country)
+
+            newApplication.school = school
+            newApplication.otherHackathons = request.POST.get("isFirstHackathon")
+            print(request.POST)
+            newApplication.resume = request.POST.get("resume")
+            newApplication.github = request.POST.get("github")
+            newApplication.linkedIn = request.POST.get("linkedIn")
+            newApplication.linkedIn = request.POST.get("freeResp")
+            newApplication.linkedIn = request.POST.get("dribble")
+            newApplication.website = request.POST.get("personalSite")
+            newApplication.freeResponce = request.POST.get("freeResponse")
+            newApplication.save()
+            return JsonResponse({}, status=200)
+            pass
         else:
-            errors = {"user errors":userForm.errors, "user Type Errors":userTypeForm.errors}
+            #Edit for the errors for the Application form
+            errors = {"user errors":appForm.errors}
             return JsonResponse(errors,status=406)
+    else:
+        return JsonResponse({"Error":"Resource not available"},status=501)
+
+@api_view(["GET"])
+def getAllSchool(request):
+    return School.objects.all()
